@@ -9,6 +9,7 @@ concurrency:
   cancel-in-progress: false
 permissions:
   contents: read
+  actions: write      # lets a finished run start the next one (workflow_dispatch is allowed for GITHUB_TOKEN)
 jobs:
   keep:
     runs-on: ubuntu-latest
@@ -21,3 +22,8 @@ jobs:
           INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
           INSTABOX_MACHINES: ${{ secrets.INSTABOX_MACHINES }}   # e.g. vm1,vm2,google-maps-scrapper-3
           CYCLE_HOURS: ${{ vars.CYCLE_HOURS }}                  # leave empty = off; 7.25 = on
+      - name: Start the next watch (chains the runs, so coverage does not depend on GitHub's scheduler)
+        if: always()
+        run: gh workflow run instabox-keeper.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.ref_name }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
