@@ -121,16 +121,21 @@ def main():
     ap.add_argument("--machines", default=os.environ.get("INSTABOX_MACHINES", ""), help="comma-separated machine names")
     ap.add_argument("--cycle-hours", type=float, default=0.0, help="pause+resume a machine that has run this long since its last resume (0 = off)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--loop-minutes", type=float, default=0.0, help="keep checking for this long (GitHub schedules can be hours apart); 0 = one pass")
+    ap.add_argument("--interval-seconds", type=float, default=120.0, help="pause between passes when looping")
     a = ap.parse_args()
     names = [n.strip() for n in a.machines.split(",") if n.strip()]
     if not KEY: sys.exit("INSTABOX_API_KEY is not set")
     if not names: sys.exit("no machines: use --machines or INSTABOX_MACHINES")
-    ok = True
-    for n in names:
-        try: ok = handle(n, a.cycle_hours, a.dry_run) and ok
-        except Exception as e: log(machine=n, error=str(e)[:300]); ok = False
+    end = time.time() + a.loop_minutes * 60
+    while True:
+        ok = True
+        for n in names:
+            try: ok = handle(n, a.cycle_hours, a.dry_run) and ok
+            except Exception as e: log(machine=n, error=str(e)[:300]); ok = False
+        if time.time() + a.interval_seconds >= end: break
+        time.sleep(a.interval_seconds)
     sys.exit(0 if ok else 1)
-
 
 if __name__ == "__main__":
     main()

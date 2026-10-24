@@ -68,3 +68,12 @@ def _clock_tests():
 
 
 _clock_tests()
+
+
+# loop mode: a machine that gets suspended during the loop is resumed on a later pass
+reset(a=("running", {}))
+import threading as _t
+_t.Timer(0.3, lambda: M["a"].update(state="suspended")).start()
+rc, out = subprocess.run([sys.executable, "-I", K, "--machines", "a", "--loop-minutes", "0.05", "--interval-seconds", "0.5"], env=env, capture_output=True, text=True).returncode, ""
+assert rc == 0 and ("m_a", "resume") in POSTS, (rc, POSTS)
+print("loop test passed")
