@@ -1,0 +1,22 @@
+name: instabox-keeper
+on:
+  schedule:
+    - cron: "*/10 * * * *"      # GitHub may delay scheduled runs by a few minutes
+  workflow_dispatch: {}          # lets you run it by hand from the Actions tab
+concurrency:
+  group: instabox-keeper
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  keep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resume any paused or stopped machine (no cycling unless CYCLE_HOURS is set)
+        run: python3 -I instabox_keeper.py --cycle-hours "${CYCLE_HOURS:-0}"
+        env:
+          INSTABOX_API_KEY: ${{ secrets.INSTABOX_API_KEY }}
+          INSTABOX_MACHINES: ${{ secrets.INSTABOX_MACHINES }}   # e.g. vm1,vm2,google-maps-scrapper-3
+          CYCLE_HOURS: ${{ vars.CYCLE_HOURS }}                  # leave empty = off; 7.25 = on
