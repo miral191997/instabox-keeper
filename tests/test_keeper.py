@@ -22,23 +22,23 @@ srv = HTTPServer(("127.0.0.1", 0), H); threading.Thread(target=srv.serve_forever
 env = {**os.environ, "INSTABOX_API_URL": f"http://127.0.0.1:{srv.server_port}", "INSTABOX_API_KEY": "k", "KEEPER_FAST": "1"}
 K = os.path.join(os.path.dirname(__file__), "..", "instabox_keeper.py")
 def run(*args): r = subprocess.run([sys.executable, "-I", K, *args], env=env, capture_output=True, text=True); return r.returncode, r.stdout
-def reset(**ms): M.clear(); M.update({k: {"state": v[0], "metadata": v[1]} for k, v in ms.items()}); POSTS.clear()
+def reset(**ms): M.clear(); M.update({k: {"id": "m_" + k, "state": v[0], "metadata": v[1]} for k, v in ms.items()}); M.update({"m_" + k: M[k] for k in ms}); POSTS.clear()
 now = int(time.time())
 reset(a=("suspended", {}), b=("stopped", {}), c=("running", {}))
 rc, out = run("--machines", "a,b,c"); assert rc == 0, out
-assert sorted(POSTS) == [("a", "resume"), ("b", "start")], POSTS
+assert sorted(POSTS) == [("m_a", "resume"), ("m_b", "start")], POSTS  # changes go by id
 assert "keeper_cycled_at" in M["a"]["metadata"] and "keeper_cycled_at" in M["b"]["metadata"] and "keeper_cycled_at" in M["c"]["metadata"]
 reset(a=("running", {"keeper_cycled_at": str(now - 3600), "x": "keep"}))
 rc, out = run("--machines", "a", "--cycle-hours", "7.25"); assert rc == 0 and POSTS == [], (POSTS, out)       # 1 h old: no cycle
 reset(a=("running", {"keeper_cycled_at": str(now - 8 * 3600), "x": "keep"}))
-rc, out = run("--machines", "a", "--cycle-hours", "7.25"); assert rc == 0 and POSTS == [("a", "suspend"), ("a", "resume")], (POSTS, out)
+rc, out = run("--machines", "a", "--cycle-hours", "7.25"); assert rc == 0 and POSTS == [("m_a", "suspend"), ("m_a", "resume")], (POSTS, out)
 assert M["a"]["metadata"]["x"] == "keep" and int(M["a"]["metadata"]["keeper_cycled_at"]) >= now, M["a"]  # other labels kept, clock restarted
 reset(a=("running", {"keeper_cycled_at": str(now - 8 * 3600)}))
 rc, out = run("--machines", "a"); assert rc == 0 and POSTS == [], "cycle must be off by default"
 reset(a=("suspended", {}), b=("stopped", {}))
 rc, out = run("--machines", "a,b", "--dry-run"); assert rc == 0 and POSTS == [] and M["a"]["state"] == "suspended", "dry run changed something"
 reset(a=("error", {}), b=("suspended", {}))
-rc, out = run("--machines", "a,b"); assert rc == 1 and POSTS == [("b", "resume")], (rc, POSTS)          # error: untouched, others still handled, exit 1
+rc, out = run("--machines", "a,b"); assert rc == 1 and POSTS == [("m_b", "resume")], (rc, POSTS)          # error: untouched, others still handled, exit 1
 reset(a=("resuming", {}))
 rc, out = run("--machines", "a"); assert rc == 0 and POSTS == [], "must skip while an operation runs"
 rc, out = run("--machines", "nope"); assert rc == 1 and "error" in out

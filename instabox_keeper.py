@@ -55,9 +55,9 @@ def wait_state(name, wanted, timeout=180):
     raise RuntimeError(f"{name}: did not reach {sorted(wanted)} in {timeout}s (state {m['state']})")
 
 
-def post(name, action, dry):
+def post(name, action, dry, ident=None):
     if dry: log(machine=name, action=action, dry_run=True); return
-    st, r = api("POST", f"/v1/machines/{name}/{action}")
+    st, r = api("POST", f"/v1/machines/{ident or name}/{action}")  # GET takes a name, changes need the m_... id
     if st not in (200, 202): raise RuntimeError(f"{action} {name}: {st} {r.get('error', {}).get('code')} {r.get('error', {}).get('message', '')}")
     log(machine=name, action=action, op=r.get("id"), state=r.get("state"))
 
@@ -75,7 +75,7 @@ def stamp(name, m, dry, start=None):
     if dry: return
     now = int(time.time()); labels = dict(m.get("metadata") or {})
     labels[LABEL] = str(int(start or now)); labels[LABEL_AT] = str(now)
-    st, r = api("PATCH", f"/v1/machines/{name}", {"metadata": labels})
+    st, r = api("PATCH", f"/v1/machines/{m.get('id') or name}", {"metadata": labels})
     if st != 200: log(machine=name, warn=f"could not set label: {st}")
 
 
@@ -94,11 +94,11 @@ def handle(name, cycle_hours, dry):
     if s in ("starting", "resuming", "suspending", "stopping", "creating"):
         log(machine=name, state=s, note="operation in progress, skipping"); return True
     if s == "suspended":
-        post(name, "resume", dry)
+        post(name, "resume", dry, m.get("id"))
         if not dry: m = wait_state(name, {"running"}); stamp(name, m, dry)
         return True
     if s == "stopped":
-        post(name, "start", dry)
+        post(name, "start", dry, m.get("id"))
         if not dry: m = wait_state(name, {"running"}); stamp(name, m, dry)
         return True
     if s == "running":
@@ -106,9 +106,9 @@ def handle(name, cycle_hours, dry):
         if need_stamp: stamp(name, m, dry, start); log(machine=name, state=s, note=f"clock start recorded: {age_h:.2f} h ago")
         if cycle_hours and age_h >= cycle_hours:
             log(machine=name, state=s, note=f"running {age_h:.2f} h since the last resume: cycling (pause + resume)")
-            post(name, "suspend", dry)
+            post(name, "suspend", dry, m.get("id"))
             if not dry: wait_state(name, {"suspended"}, 120)
-            post(name, "resume", dry)
+            post(name, "resume", dry, m.get("id"))
             if not dry: m = wait_state(name, {"running"}); stamp(name, m, dry)
         else:
             log(machine=name, state=s, running_h=round(age_h, 2))
