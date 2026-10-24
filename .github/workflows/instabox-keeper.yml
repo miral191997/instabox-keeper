@@ -1,6 +1,7 @@
 name: instabox-keeper
 on:
   schedule:
+    - cron: "5,35 * * * *"      # twice an hour, off the busy :00 mark: extra chances that GitHub starts one near a pause
     - cron: "*/10 * * * *"      # GitHub often runs these hourly or later; each run therefore keeps watching for ~55 min
   workflow_dispatch: {}          # lets you run it by hand from the Actions tab
 concurrency:
